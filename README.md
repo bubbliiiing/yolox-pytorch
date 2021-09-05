@@ -38,7 +38,7 @@ pytorch==1.2.0
 
 ## 文件下载
 训练所需的权值可在百度网盘中下载。  
-链接: https://pan.baidu.com/s/1o14Vi-CzZEaz9hic_OPZCQ 提取码: 4kc2    
+链接: https://pan.baidu.com/s/1OnM-uWKETFJh_uFCAK6Vlg 提取码: b6km   
 
 VOC数据集下载地址如下：  
 VOC2007+2012训练集    
