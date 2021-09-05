@@ -14,10 +14,6 @@ from utils.dataloader import YoloDataset, yolo_dataset_collate
 from utils.utils import get_classes
 from utils.utils_fit import fit_one_epoch
 
-#----------------------------------------------------#
-#   检测精度mAP和pr曲线计算参考视频
-#   https://www.bilibili.com/video/BV1zE411u7Vw
-#----------------------------------------------------#
 if __name__ == "__main__":
     #-------------------------------#
     #   是否使用Cuda
@@ -172,11 +168,11 @@ if __name__ == "__main__":
             lr_scheduler.step()
             
     if True:
-        batch_size  = Freeze_batch_size
-        lr          = Freeze_lr
-        start_epoch = Init_Epoch
-        end_epoch   = Freeze_Epoch
-
+        batch_size  = Unfreeze_batch_size
+        lr          = Unfreeze_lr
+        start_epoch = Freeze_Epoch
+        end_epoch   = UnFreeze_Epoch
+        
         optimizer       = optim.Adam(model_train.parameters(), lr, weight_decay = 5e-4)
         if Cosine_scheduler:
             lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5, eta_min=1e-5)
