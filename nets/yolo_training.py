@@ -367,8 +367,6 @@ class YOLOLoss(nn.Module):
         pred_ious_this_matching = (matching_matrix * pair_wise_ious).sum(0)[fg_mask_inboxes]
         return num_fg, gt_matched_classes, pred_ious_this_matching, matched_gt_inds
 
-
-
 def weights_init(net, init_type='normal', init_gain = 0.02):
     def init_func(m):
         classname = m.__class__.__name__

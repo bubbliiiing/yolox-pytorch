@@ -104,11 +104,7 @@ def non_max_suppression(prediction, num_classes, input_shape, image_shape, lette
             nms_thres,
         )
 
-        detections = detections[nms_out_index]
-        if output[i] is None:
-            output[i] = detections
-        else:
-            output[i] = torch.cat((output[i], detections))
+        output[i]   = detections[nms_out_index]
 
         # #------------------------------------------#
         # #   获得预测结果中包含的所有种类
