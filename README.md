@@ -40,8 +40,9 @@ pytorch==1.2.0
 
 ## 文件下载
 训练所需的权值可在百度网盘中下载。  
-链接: https://pan.baidu.com/s/1bi2UBwwIHES0OpLeyYuBFg 提取码: f4ni   
-
+链接: https://pan.baidu.com/s/1bi2UBwwIHES0OpLeyYuBFg    
+提取码: f4ni    
+ 
 VOC数据集下载地址如下，里面已经包括了训练集、测试集、验证集（与测试集一样），无需再次划分：  
 链接: https://pan.baidu.com/s/1YuBbBKxm2FGgTU5OfaeC5A    
 提取码: uack   
