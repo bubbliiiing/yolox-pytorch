@@ -12,7 +12,6 @@ if __name__ == "__main__":
     '''
     Recall和Precision不像AP是一个面积的概念，在门限值不同时，网络的Recall和Precision值是不同的。
     map计算结果中的Recall和Precision代表的是当预测时，门限置信度为0.5时，所对应的Recall和Precision值。
-
     此处获得的./map_out/detection-results/里面的txt的框的数量会比直接predict多一些，这是因为这里的门限低，
     目的是为了计算不同门限条件下的Recall和Precision值，从而实现map的计算。
     '''

@@ -33,13 +33,29 @@ def decode_outputs(outputs, input_shape):
     grids   = []
     strides = []
     hw      = [x.shape[-2:] for x in outputs]
+    #---------------------------------------------------#
+    #   outputs输入前代表每个特征层的预测结果
+    #   batch_size, 4 + 1 + num_classes, 80, 80 => batch_size, 4 + 1 + num_classes, 6400
+    #   batch_size, 5 + num_classes, 40, 40
+    #   batch_size, 5 + num_classes, 20, 20
+    #   batch_size, 4 + 1 + num_classes, 6400 + 1600 + 400 -> batch_size, 4 + 1 + num_classes, 8400
+    #   堆叠后为batch_size, 8400, 5 + num_classes
+    #---------------------------------------------------#
     outputs = torch.cat([x.flatten(start_dim=2) for x in outputs], dim=2).permute(0, 2, 1)
+    #---------------------------------------------------#
+    #   获得每一个特征点属于每一个种类的概率
+    #---------------------------------------------------#
     outputs[:, :, 4:] = torch.sigmoid(outputs[:, :, 4:])
     for h, w in hw:
         #---------------------------#
-        #   根据特征层生成网格点
-        #---------------------------#
+        #   根据特征层的高宽生成网格点
+        #---------------------------#   
         grid_y, grid_x  = torch.meshgrid([torch.arange(h), torch.arange(w)])
+        #---------------------------#
+        #   1, 6400, 2
+        #   1, 1600, 2
+        #   1, 400, 2
+        #---------------------------#   
         grid            = torch.stack((grid_x, grid_y), 2).view(1, -1, 2)
         shape           = grid.shape[:2]
 
@@ -47,6 +63,11 @@ def decode_outputs(outputs, input_shape):
         strides.append(torch.full((shape[0], shape[1], 1), input_shape[0] / h))
     #---------------------------#
     #   将网格点堆叠到一起
+    #   1, 6400, 2
+    #   1, 1600, 2
+    #   1, 400, 2
+    #
+    #   1, 8400, 2
     #---------------------------#
     grids               = torch.cat(grids, dim=1).type(outputs.type())
     strides             = torch.cat(strides, dim=1).type(outputs.type())
@@ -73,8 +94,11 @@ def non_max_suppression(prediction, num_classes, input_shape, image_shape, lette
     box_corner[:, :, 2] = prediction[:, :, 0] + prediction[:, :, 2] / 2
     box_corner[:, :, 3] = prediction[:, :, 1] + prediction[:, :, 3] / 2
     prediction[:, :, :4] = box_corner[:, :, :4]
-
+    
     output = [None for _ in range(len(prediction))]
+    #----------------------------------------------------------#
+    #   对输入图片进行循环，一般只会进行一次
+    #----------------------------------------------------------#
     for i, image_pred in enumerate(prediction):
         #----------------------------------------------------------#
         #   对种类预测部分取max。

@@ -28,7 +28,7 @@ class YOLO(object):
         #---------------------------------------------------------------------#
         "input_shape"       : [640, 640],
         #---------------------------------------------------------------------#
-        #   所使用的YoloX的版本。s、m、l、x
+        #   所使用的YoloX的版本。nano、tiny、s、m、l、x
         #---------------------------------------------------------------------#
         "phi"               : 's',
         #---------------------------------------------------------------------#
@@ -87,7 +87,6 @@ class YOLO(object):
         device      = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.net.load_state_dict(torch.load(self.model_path, map_location=device))
         self.net    = self.net.eval()
-
         print('{} model, and classes loaded.'.format(self.model_path))
 
         if self.cuda:
@@ -98,6 +97,9 @@ class YOLO(object):
     #   检测图片
     #---------------------------------------------------#
     def detect_image(self, image):
+        #---------------------------------------------------#
+        #   获得输入图片的高和宽
+        #---------------------------------------------------#
         image_shape = np.array(np.shape(image)[0:2])
         #---------------------------------------------------------#
         #   在这里将图像转换成RGB图像，防止灰度图在预测时报错。
