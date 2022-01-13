@@ -36,7 +36,6 @@ pytorch==1.2.0
 在train.py文件下：   
 1、mosaic参数可用于控制是否实现Mosaic数据增强。   
 2、Cosine_scheduler可用于控制是否使用学习率余弦退火衰减。   
-3、label_smoothing可用于控制是否Label Smoothing平滑。
 
 ## 文件下载
 训练所需的权值可在百度网盘中下载。  
