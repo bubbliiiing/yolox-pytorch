@@ -25,7 +25,7 @@
 ## 实现的内容
 - [x] 主干特征提取网络：使用了Focus网络结构。  
 - [x] 分类回归层：Decoupled Head，在YoloX中，Yolo Head被分为了分类回归两部分，最后预测的时候才整合在一起。
-- [x] 训练用到的小技巧：Mosaic数据增强、CIOU（原版是IOU和GIOU，CIOU效果类似，都是IOU系列的，甚至更新一些）、学习率余弦退火衰减。
+- [x] 训练用到的小技巧：Mosaic数据增强、IOU和GIOU、学习率余弦退火衰减。
 - [x] Anchor Free：不使用先验框
 - [x] SimOTA：为不同大小的目标动态匹配正样本。
 
