@@ -15,20 +15,20 @@
 
 ## Top News
 **`2022-03`**:**进行了大幅度的更新，支持step、cos学习率下降法、支持adam、sgd优化器选择、支持学习率根据batch_size自适应调整、新增图片裁剪。**  
-BiliBili视频中的原仓库地址为：https://github.com/bubbliiiing/yolox-keras/tree/bilibili
+BiliBili视频中的原仓库地址为：https://github.com/bubbliiiing/yolox-pytorch/tree/bilibili
 
 **`2021-10`**:**创建仓库，支持不同尺寸模型训练、支持大量可调整参数，支持fps、视频预测、批量预测等功能。**   
 
 ## 相关仓库
 | 模型 | 路径 |
 | :----- | :----- |
-YoloV3 | https://github.com/bubbliiiing/yolo3-keras  
-Efficientnet-Yolo3 | https://github.com/bubbliiiing/efficientnet-yolo3-keras  
-YoloV4 | https://github.com/bubbliiiing/yolov4-keras
-YoloV4-tiny | https://github.com/bubbliiiing/yolov4-tiny-keras
-Mobilenet-Yolov4 | https://github.com/bubbliiiing/mobilenet-yolov4-keras
-YoloV5 | https://github.com/bubbliiiing/yolov5-keras
-YoloX | https://github.com/bubbliiiing/yolox-keras
+YoloV3 | https://github.com/bubbliiiing/yolo3-pytorch  
+Efficientnet-Yolo3 | https://github.com/bubbliiiing/efficientnet-yolo3-pytorch  
+YoloV4 | https://github.com/bubbliiiing/yolov4-pytorch
+YoloV4-tiny | https://github.com/bubbliiiing/yolov4-tiny-pytorch
+Mobilenet-Yolov4 | https://github.com/bubbliiiing/mobilenet-yolov4-pytorch
+YoloV5 | https://github.com/bubbliiiing/yolov5-pytorch
+YoloX | https://github.com/bubbliiiing/yolox-pytorch
 
 ## 性能情况
 | 训练数据集 | 权值文件名称 | 测试数据集 | 输入图片大小 | mAP 0.5:0.95 | mAP 0.5 |
