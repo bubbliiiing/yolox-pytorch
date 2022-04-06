@@ -6,7 +6,7 @@ from tqdm import tqdm
 from utils.utils import get_lr
 
 
-def fit_one_epoch(model_train, model, yolo_loss, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, Epoch, cuda, save_period, save_dir):
+def fit_one_epoch(model_train, model, yolo_loss, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, Epoch, cuda, save_period, save_dir, scaler, fp16):
     loss        = 0
     val_loss    = 0
 
@@ -29,21 +29,39 @@ def fit_one_epoch(model_train, model, yolo_loss, loss_history, optimizer, epoch,
             #   清零梯度
             #----------------------#
             optimizer.zero_grad()
-            #----------------------#
-            #   前向传播
-            #----------------------#
-            outputs         = model_train(images)
+            
+            if not fp16:
+                #----------------------#
+                #   前向传播
+                #----------------------#
+                outputs         = model_train(images)
 
-            #----------------------#
-            #   计算损失
-            #----------------------#
-            loss_value = yolo_loss(outputs, targets)
+                #----------------------#
+                #   计算损失
+                #----------------------#
+                loss_value = yolo_loss(outputs, targets)
 
-            #----------------------#
-            #   反向传播
-            #----------------------#
-            loss_value.backward()
-            optimizer.step()
+                #----------------------#
+                #   反向传播
+                #----------------------#
+                loss_value.backward()
+                optimizer.step()
+                
+            if fp16:
+                with autocast():
+                    outputs = model_train(images)
+                    #----------------------#
+                    #   计算损失
+                    #----------------------#
+                    loss_value = yolo_loss(outputs, targets)
+
+
+                #----------------------#
+                #   反向传播
+                #----------------------#
+                scaler.scale(loss_value).backward()
+                scaler.step(optimizer)
+                scaler.update()
 
             loss += loss_value.item()
             
