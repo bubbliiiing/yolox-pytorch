@@ -7,6 +7,7 @@ import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from torch.cuda.amp import GradScaler as GradScaler
 
 from nets.yolo import YoloBody
 from nets.yolo_training import (YOLOLoss, get_lr_scheduler, set_optimizer_lr,
@@ -139,6 +140,12 @@ if __name__ == "__main__":
     #                   默认先冻结主干训练后解冻训练。
     #------------------------------------------------------------------#
     Freeze_Train        = True
+    
+    #------------------------------------------------------------------#
+    #   fp16            是否使用混合精度训练
+    #                   可减少约一半的显存
+    #------------------------------------------------------------------#
+    fp16                = True
     
     #------------------------------------------------------------------#
     #   其它训练参数：学习率、优化器、学习率下降有关
@@ -274,6 +281,8 @@ if __name__ == "__main__":
         }[optimizer_type]
         optimizer.add_param_group({"params": pg1, "weight_decay": weight_decay})
         optimizer.add_param_group({"params": pg2})
+        
+        scaler = GradScaler()
 
         #---------------------------------------#
         #   获得学习率下降的公式
@@ -344,4 +353,4 @@ if __name__ == "__main__":
 
             set_optimizer_lr(optimizer, lr_scheduler_func, epoch)
 
-            fit_one_epoch(model_train, model, yolo_loss, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, UnFreeze_Epoch, Cuda, save_period, save_dir)
+            fit_one_epoch(model_train, model, yolo_loss, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, UnFreeze_Epoch, Cuda, save_period, save_dir, scaler, fp16)
