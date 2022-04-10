@@ -57,7 +57,7 @@ class IOUloss(nn.Module):
         return loss
 
 class YOLOLoss(nn.Module):    
-    def __init__(self, num_classes, strides=[8, 16, 32]):
+    def __init__(self, num_classes, fp16, strides=[8, 16, 32]):
         super().__init__()
         self.num_classes        = num_classes
         self.strides            = strides
@@ -65,6 +65,7 @@ class YOLOLoss(nn.Module):
         self.bcewithlog_loss    = nn.BCEWithLogitsLoss(reduction="none")
         self.iou_loss           = IOUloss(reduction="none")
         self.grids              = [torch.zeros(1)] * len(strides)
+        self.fp16               = fp16
 
     def forward(self, inputs, labels=None):
         outputs             = []
@@ -214,10 +215,16 @@ class YOLOLoss(nn.Module):
         #   cls_preds_          [num_gt, fg_mask, num_classes]
         #   gt_cls_per_image    [num_gt, fg_mask, num_classes]
         #-------------------------------------------------------#
-        cls_preds_          = cls_preds_.float().unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_() * obj_preds_.unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_()
-        gt_cls_per_image    = F.one_hot(gt_classes.to(torch.int64), self.num_classes).float().unsqueeze(1).repeat(1, num_in_boxes_anchor, 1)
-        pair_wise_cls_loss  = F.binary_cross_entropy(cls_preds_.sqrt_(), gt_cls_per_image, reduction="none").sum(-1)
-        del cls_preds_
+        if self.fp16:
+            with torch.cuda.amp.autocast(enabled=False):
+                cls_preds_          = cls_preds_.float().unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_() * obj_preds_.unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_()
+                gt_cls_per_image    = F.one_hot(gt_classes.to(torch.int64), self.num_classes).float().unsqueeze(1).repeat(1, num_in_boxes_anchor, 1)
+                pair_wise_cls_loss  = F.binary_cross_entropy(cls_preds_.sqrt_(), gt_cls_per_image, reduction="none").sum(-1)
+        else:
+            cls_preds_          = cls_preds_.float().unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_() * obj_preds_.unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_()
+            gt_cls_per_image    = F.one_hot(gt_classes.to(torch.int64), self.num_classes).float().unsqueeze(1).repeat(1, num_in_boxes_anchor, 1)
+            pair_wise_cls_loss  = F.binary_cross_entropy(cls_preds_.sqrt_(), gt_cls_per_image, reduction="none").sum(-1)
+            del cls_preds_
 
         cost = pair_wise_cls_loss + 3.0 * pair_wise_ious_loss + 100000.0 * (~is_in_boxes_and_center).float()
 
