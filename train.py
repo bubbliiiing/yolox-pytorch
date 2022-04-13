@@ -1,6 +1,8 @@
 #-------------------------------------#
 #       对数据集进行训练
 #-------------------------------------#
+import os
+
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
@@ -43,6 +45,12 @@ if __name__ == "__main__":
     #           没有GPU可以设置成False
     #---------------------------------#
     Cuda            = True
+    #------------------------------------------------------------------#
+    #   train_gpu   训练用到的GPU
+    #               默认为第一张卡、双卡为[0, 1]、三卡为[0, 1, 2]
+    #               在使用多GPU时，每个卡上的batch为总batch除以卡的数量。
+    #------------------------------------------------------------------#
+    train_gpu       = [0,]
     #------------------------------------------------------------------#
     #   fp16            是否使用混合精度训练
     #                   可减少约一半的显存
@@ -191,6 +199,12 @@ if __name__ == "__main__":
     train_annotation_path   = '2007_train.txt'
     val_annotation_path     = '2007_val.txt'
 
+    #------------------------------------------------------#
+    #   设置用到的显卡
+    #------------------------------------------------------#
+    os.environ["CUDA_VISIBLE_DEVICES"]  = ','.join(str(x) for x in train_gpu)
+    ngpus_per_node                      = len(train_gpu)
+
     #----------------------------------------------------#
     #   获取classes和anchor
     #----------------------------------------------------#
@@ -216,6 +230,10 @@ if __name__ == "__main__":
     yolo_loss    = YOLOLoss(num_classes, fp16)
     loss_history = LossHistory(save_dir, model, input_shape=input_shape)
     if fp16:
+        #------------------------------------------------------------------#
+        #   torch 1.2不支持amp，1.6以上才能正确使用fp16
+        #   因此torch1.2这里显示"could not be resolve"
+        #------------------------------------------------------------------#
         from torch.cuda.amp import GradScaler as GradScaler
         scaler = GradScaler()
     else:
