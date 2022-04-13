@@ -21,7 +21,7 @@ from utils.utils_fit import fit_one_epoch
 
 #------------------------------------------------------------------------------------------------------------#
 #   运行指令为：
-#   CUDA_VISIBLE_DEVICES=0,1 python -m torch.distributed.launch --nproc_per_node=4 train_DDP.py
+#   CUDA_VISIBLE_DEVICES=0,1 python -m torch.distributed.launch --nproc_per_node=2 train_DDP.py
 #------------------------------------------------------------------------------------------------------------#
 if __name__ == "__main__":
     #---------------------------------#
@@ -184,6 +184,7 @@ if __name__ == "__main__":
     #   设置用到的显卡
     #------------------------------------------------------#
     dist.init_process_group(backend="nccl")
+    ngpus_per_node = len(torch.cuda.device_count())
     local_rank  = int(os.environ["LOCAL_RANK"])
     rank        = int(os.environ["RANK"])
     print(f"[{os.getpid()}] (rank = {rank}, local_rank = {local_rank}) training...")
@@ -225,7 +226,7 @@ if __name__ == "__main__":
     else:
         scaler = None
         
-    model_train = model.train()
+    model_train     = model.train()
     #----------------------------#
     #   多卡同步Bn
     #----------------------------#
@@ -318,10 +319,14 @@ if __name__ == "__main__":
         #---------------------------------------#
         train_dataset   = YoloDataset(train_lines, input_shape, num_classes, epoch_length = UnFreeze_Epoch, mosaic=mosaic, train = True)
         val_dataset     = YoloDataset(val_lines, input_shape, num_classes, epoch_length = UnFreeze_Epoch, mosaic=False, train = False)
-        gen             = DataLoader(train_dataset, shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True,
-                                    drop_last=True, collate_fn=yolo_dataset_collate)
-        gen_val         = DataLoader(val_dataset  , shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True, 
-                                    drop_last=True, collate_fn=yolo_dataset_collate)
+        
+        train_sampler   = torch.utils.data.distributed.DistributedSampler(train_dataset, shuffle=True,)
+        val_sampler     = torch.utils.data.distributed.DistributedSampler(val_dataset, shuffle=False,)
+        
+        gen             = DataLoader(train_dataset, shuffle = True, batch_size = batch_size // ngpus_per_node, num_workers = num_workers, pin_memory=True,
+                                    drop_last=True, collate_fn=yolo_dataset_collate, sampler=train_sampler)
+        gen_val         = DataLoader(val_dataset  , shuffle = True, batch_size = batch_size // ngpus_per_node, num_workers = num_workers, pin_memory=True, 
+                                    drop_last=True, collate_fn=yolo_dataset_collate, sampler=val_sampler)
 
         #---------------------------------------#
         #   开始模型训练
@@ -356,10 +361,10 @@ if __name__ == "__main__":
                 if epoch_step == 0 or epoch_step_val == 0:
                     raise ValueError("数据集过小，无法继续进行训练，请扩充数据集。")
 
-                gen     = DataLoader(train_dataset, shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True,
-                                            drop_last=True, collate_fn=yolo_dataset_collate)
-                gen_val = DataLoader(val_dataset  , shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True, 
-                                            drop_last=True, collate_fn=yolo_dataset_collate)
+                gen         = DataLoader(train_dataset, shuffle = True, batch_size = batch_size // ngpus_per_node, num_workers = num_workers, pin_memory=True,
+                                            drop_last=True, collate_fn=yolo_dataset_collate, sampler=train_sampler)
+                gen_val     = DataLoader(val_dataset  , shuffle = True, batch_size = batch_size // ngpus_per_node, num_workers = num_workers, pin_memory=True, 
+                                            drop_last=True, collate_fn=yolo_dataset_collate, sampler=val_sampler)
 
                 UnFreeze_flag = True
 

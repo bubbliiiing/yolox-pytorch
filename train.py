@@ -6,6 +6,7 @@ import os
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
+import torch.distributed as dist
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
@@ -45,17 +46,20 @@ if __name__ == "__main__":
     #           没有GPU可以设置成False
     #---------------------------------#
     Cuda            = True
-    #------------------------------------------------------------------#
-    #   train_gpu   训练用到的GPU
-    #               默认为第一张卡、双卡为[0, 1]、三卡为[0, 1, 2]
-    #               在使用多GPU时，每个卡上的batch为总batch除以卡的数量。
-    #------------------------------------------------------------------#
-    train_gpu       = [0,]
-    #------------------------------------------------------------------#
-    #   fp16            是否使用混合精度训练
-    #                   可减少约一半的显存
-    #                   需要pytorch1.6.0以上
-    #------------------------------------------------------------------#
+    #---------------------------------------------------------------------#
+    #   distributed 多卡分布式运行
+    #   DP模式  ：CUDA_VISIBLE_DEVICES=0,1 train.py
+    #   DDP模式 ：CUDA_VISIBLE_DEVICES=0,1 python -m torch.distributed.launch --nproc_per_node=2 train.py
+    #---------------------------------------------------------------------#
+    distributed     = False
+    #---------------------------------------------------------------------#
+    #   sync_bn     是否使用sync_bn，多卡可用
+    #---------------------------------------------------------------------#
+    sync_bn         = False
+    #---------------------------------------------------------------------#
+    #   fp16        是否使用混合精度训练
+    #               可减少约一半的显存、需要pytorch1.7.1以上
+    #---------------------------------------------------------------------#
     fp16            = False
     #---------------------------------------------------------------------#
     #   classes_path    指向model_data下的txt，与自己训练的数据集相关 
@@ -202,9 +206,19 @@ if __name__ == "__main__":
     #------------------------------------------------------#
     #   设置用到的显卡
     #------------------------------------------------------#
-    os.environ["CUDA_VISIBLE_DEVICES"]  = ','.join(str(x) for x in train_gpu)
-    ngpus_per_node                      = len(train_gpu)
-
+    ngpus_per_node  = torch.cuda.device_count()
+    if distributed:
+        dist.init_process_group(backend="nccl")
+        local_rank  = int(os.environ["LOCAL_RANK"])
+        rank        = int(os.environ["RANK"])
+        device      = torch.device("cuda", local_rank)
+        if local_rank == 0:
+            print(f"[{os.getpid()}] (rank = {rank}, local_rank = {local_rank}) training...")
+            print("Gpu Device Count : ", ngpus_per_node)
+    else:
+        device          = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        local_rank      = 0
+        
     #----------------------------------------------------#
     #   获取classes和anchor
     #----------------------------------------------------#
@@ -216,11 +230,11 @@ if __name__ == "__main__":
     model = YoloBody(num_classes, phi)
     weights_init(model)
     if model_path != '':
-        #------------------------------------------------------#
-        #   权值文件请看README，百度网盘下载
-        #------------------------------------------------------#
-        print('Load weights {}.'.format(model_path))
-        device          = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        if local_rank:
+            #------------------------------------------------------#
+            #   权值文件请看README，百度网盘下载
+            #------------------------------------------------------#
+            print('Load weights {}.'.format(model_path))
         model_dict      = model.state_dict()
         pretrained_dict = torch.load(model_path, map_location = device)
         pretrained_dict = {k: v for k, v in pretrained_dict.items() if np.shape(model_dict[k]) == np.shape(v)}
@@ -231,7 +245,7 @@ if __name__ == "__main__":
     loss_history = LossHistory(save_dir, model, input_shape=input_shape)
     if fp16:
         #------------------------------------------------------------------#
-        #   torch 1.2不支持amp，1.6以上才能正确使用fp16
+        #   torch 1.2不支持amp，建议使用torch 1.7.1及以上正确使用fp16
         #   因此torch1.2这里显示"could not be resolve"
         #------------------------------------------------------------------#
         from torch.cuda.amp import GradScaler as GradScaler
@@ -239,11 +253,26 @@ if __name__ == "__main__":
     else:
         scaler = None
 
-    model_train = model.train()
+    model_train     = model.train()
+    #----------------------------#
+    #   多卡同步Bn
+    #----------------------------#
+    if sync_bn and torch.cuda.device_count() > 1:
+        model_train = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model_train)
+    elif sync_bn and torch.cuda.device_count() == 1:
+        print("Sync_bn is not support in one gpu or cpu.")
+        
     if Cuda:
-        model_train = torch.nn.DataParallel(model)
-        cudnn.benchmark = True
-        model_train = model_train.cuda()
+        if distributed:
+            #----------------------------#
+            #   多卡平行运行
+            #----------------------------#
+            model_train = model_train.cuda(local_rank)
+            model_train = torch.nn.parallel.DistributedDataParallel(model_train, device_ids=[local_rank])
+        else:
+            model_train = torch.nn.DataParallel(model)
+            cudnn.benchmark = True
+            model_train = model_train.cuda()
 
     #---------------------------#
     #   读取数据集对应的txt
@@ -323,10 +352,19 @@ if __name__ == "__main__":
         #---------------------------------------#
         train_dataset   = YoloDataset(train_lines, input_shape, num_classes, epoch_length = UnFreeze_Epoch, mosaic=mosaic, train = True)
         val_dataset     = YoloDataset(val_lines, input_shape, num_classes, epoch_length = UnFreeze_Epoch, mosaic=False, train = False)
+        
+        if distributed:
+            train_sampler   = torch.utils.data.distributed.DistributedSampler(train_dataset, shuffle=True,)
+            val_sampler     = torch.utils.data.distributed.DistributedSampler(val_dataset, shuffle=False,)
+            batch_size      = batch_size // ngpus_per_node
+        else:
+            train_sampler   = None
+            val_sampler     = None
+            
         gen             = DataLoader(train_dataset, shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True,
-                                    drop_last=True, collate_fn=yolo_dataset_collate)
+                                    drop_last=True, collate_fn=yolo_dataset_collate, sampler=train_sampler)
         gen_val         = DataLoader(val_dataset  , shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True, 
-                                    drop_last=True, collate_fn=yolo_dataset_collate)
+                                    drop_last=True, collate_fn=yolo_dataset_collate, sampler=val_sampler)
 
         #---------------------------------------#
         #   开始模型训练
@@ -361,10 +399,13 @@ if __name__ == "__main__":
                 if epoch_step == 0 or epoch_step_val == 0:
                     raise ValueError("数据集过小，无法继续进行训练，请扩充数据集。")
 
+                if distributed:
+                    batch_size = batch_size // ngpus_per_node
+                    
                 gen     = DataLoader(train_dataset, shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True,
-                                            drop_last=True, collate_fn=yolo_dataset_collate)
+                                    drop_last=True, collate_fn=yolo_dataset_collate, sampler=train_sampler)
                 gen_val = DataLoader(val_dataset  , shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True, 
-                                            drop_last=True, collate_fn=yolo_dataset_collate)
+                                    drop_last=True, collate_fn=yolo_dataset_collate, sampler=val_sampler)
 
                 UnFreeze_flag = True
 
@@ -373,4 +414,4 @@ if __name__ == "__main__":
 
             set_optimizer_lr(optimizer, lr_scheduler_func, epoch)
 
-            fit_one_epoch(model_train, model, yolo_loss, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, UnFreeze_Epoch, Cuda, fp16, scaler, save_period, save_dir)
+            fit_one_epoch(model_train, model, yolo_loss, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, UnFreeze_Epoch, Cuda, fp16, scaler, save_period, save_dir, local_rank)
