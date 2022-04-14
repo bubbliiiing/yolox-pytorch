@@ -103,7 +103,7 @@ class YOLOLoss(nn.Module):
         grid                = grid.view(1, -1, 2)
 
         output              = output.flatten(start_dim=2).permute(0, 2, 1)
-        output[..., :2]     = (output[..., :2] + grid) * stride
+        output[..., :2]     = (output[..., :2] + grid.type_as(output)) * stride
         output[..., 2:4]    = torch.exp(output[..., 2:4]) * stride
         return output, grid
 
@@ -127,9 +127,9 @@ class YOLOLoss(nn.Module):
         #   y_shifts            [1, n_anchors_all]
         #   expanded_strides    [1, n_anchors_all]
         #-----------------------------------------------#
-        x_shifts            = torch.cat(x_shifts, 1)
-        y_shifts            = torch.cat(y_shifts, 1)
-        expanded_strides    = torch.cat(expanded_strides, 1)
+        x_shifts            = torch.cat(x_shifts, 1).type_as(outputs)
+        y_shifts            = torch.cat(y_shifts, 1).type_as(outputs)
+        expanded_strides    = torch.cat(expanded_strides, 1).type_as(outputs)
 
         cls_targets = []
         reg_targets = []
@@ -152,8 +152,8 @@ class YOLOLoss(nn.Module):
                 #   cls_preds_per_image     [n_anchors_all, num_classes]
                 #   obj_preds_per_image     [n_anchors_all, 1]
                 #-----------------------------------------------#
-                gt_bboxes_per_image     = labels[batch_idx][..., :4]
-                gt_classes              = labels[batch_idx][..., 4]
+                gt_bboxes_per_image     = labels[batch_idx][..., :4].type_as(outputs)
+                gt_classes              = labels[batch_idx][..., 4].type_as(outputs)
                 bboxes_preds_per_image  = bbox_preds[batch_idx]
                 cls_preds_per_image     = cls_preds[batch_idx]
                 obj_preds_per_image     = obj_preds[batch_idx]
