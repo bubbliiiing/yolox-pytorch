@@ -12,8 +12,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from nets.yolo import YoloBody
-from nets.yolo_training import (YOLOLoss, get_lr_scheduler, set_optimizer_lr,
-                                weights_init)
+from nets.yolo_training import (ModelEMA, YOLOLoss, get_lr_scheduler,
+                                set_optimizer_lr, weights_init)
 from utils.callbacks import LossHistory
 from utils.dataloader import YoloDataset, yolo_dataset_collate
 from utils.utils import get_classes
@@ -284,6 +284,11 @@ if __name__ == "__main__":
             cudnn.benchmark = True
             model_train = model_train.cuda()
 
+    #----------------------------#
+    #   权值平滑
+    #----------------------------#
+    ema = ModelEMA(model_train) if rank == 0 else None
+    
     #---------------------------#
     #   读取数据集对应的txt
     #---------------------------#
@@ -429,7 +434,7 @@ if __name__ == "__main__":
 
             set_optimizer_lr(optimizer, lr_scheduler_func, epoch)
 
-            fit_one_epoch(model_train, model, yolo_loss, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, UnFreeze_Epoch, Cuda, fp16, scaler, save_period, save_dir, local_rank)
+            fit_one_epoch(model_train, model, ema, yolo_loss, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, UnFreeze_Epoch, Cuda, fp16, scaler, save_period, save_dir, local_rank)
             
         if local_rank == 0:
             loss_history.writer.close()
