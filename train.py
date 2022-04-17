@@ -224,6 +224,7 @@ if __name__ == "__main__":
     else:
         device          = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         local_rank      = 0
+        rank            = 0
         
     #----------------------------------------------------#
     #   获取classes和anchor
@@ -361,6 +362,8 @@ if __name__ == "__main__":
         
         if epoch_step == 0 or epoch_step_val == 0:
             raise ValueError("数据集过小，无法继续进行训练，请扩充数据集。")
+        
+        ema.updates     = epoch_step * Init_Epoch
 
         #---------------------------------------#
         #   构建数据集加载器。
@@ -418,6 +421,8 @@ if __name__ == "__main__":
 
                 if distributed:
                     batch_size = batch_size // ngpus_per_node
+                    
+                ema.updates     = epoch_step * epoch
                     
                 gen             = DataLoader(train_dataset, shuffle = shuffle, batch_size = batch_size, num_workers = num_workers, pin_memory=True,
                                             drop_last=True, collate_fn=yolo_dataset_collate, sampler=train_sampler)
